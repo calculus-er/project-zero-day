@@ -24,7 +24,8 @@ export default function App() {
   const [scanStatus, setScanStatus] = useState("IDLE");
   const [rawStatus, setRawStatus] = useState("idle");
   const [wsConnected, setWsConnected] = useState(false);
-  const [webhookConnected] = useState(false);
+  const [webhookConnected, setWebhookConnected] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState(null);
   const [breachTrigger, setBreachTrigger] = useState(0);
   const [currentAgent, setCurrentAgent] = useState("—");
   const [phase, setPhase] = useState("STANDBY");
@@ -34,6 +35,19 @@ export default function App() {
 
   const isScanning = rawStatus === "running";
 
+  const fetchWebhookStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/webhook/status`);
+      const data = await res.json();
+      console.log("[App] webhook status:", data);
+      setWebhookConnected(Boolean(data.ngrok_connected));
+      setWebhookUrl(data.webhook_url || null);
+    } catch (err) {
+      console.error("[App] webhook status failed:", err);
+      setWebhookConnected(false);
+    }
+  }, []);
+
   const fetchStatus = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/status`);
@@ -41,6 +55,9 @@ export default function App() {
       console.log("[App] status poll:", data);
       setRawStatus(data.status);
       setScanStatus(statusToLabel(data.status));
+      if (typeof data.ngrok_connected === "boolean") {
+        setWebhookConnected(data.ngrok_connected);
+      }
       if (data.status === "running") setPhase("RED SWARM ACTIVE");
       else if (data.status === "breached") setPhase("BREACH");
       else if (data.status === "failed") setPhase("EXHAUSTED");
@@ -75,6 +92,7 @@ export default function App() {
         setPhase("BREACH");
       }
 
+      if (data.agent === "WEBHOOK") setPhase("AUTO-TRIGGER");
       if (data.agent === "ALPHA") setPhase("RECON");
       if (data.agent === "BETA") setPhase("EXPLOIT");
       if (data.agent === "GAMMA") setPhase("ANALYSIS");
@@ -106,11 +124,17 @@ export default function App() {
     };
 
     fetchStatus();
+    fetchWebhookStatus();
 
     return () => {
       ws.close();
     };
-  }, [handleWsMessage, fetchStatus]);
+  }, [handleWsMessage, fetchStatus, fetchWebhookStatus]);
+
+  useEffect(() => {
+    const webhookPoll = setInterval(fetchWebhookStatus, 5000);
+    return () => clearInterval(webhookPoll);
+  }, [fetchWebhookStatus]);
 
   useEffect(() => {
     if (isScanning || rawStatus === "breached") {
@@ -179,6 +203,7 @@ export default function App() {
             setVulnLabel={setVulnLabel}
             scanStatus={scanStatus}
             webhookConnected={webhookConnected}
+            webhookUrl={webhookUrl}
             wsConnected={wsConnected}
             onLaunch={handleLaunch}
             isScanning={isScanning}

@@ -5,6 +5,7 @@ export default function AttackPanel({
   setVulnLabel,
   scanStatus,
   webhookConnected,
+  webhookUrl,
   wsConnected,
   onLaunch,
   isScanning,
@@ -59,6 +60,11 @@ export default function AttackPanel({
           WEBHOOK {webhookConnected ? "ONLINE" : "OFFLINE"}
         </span>
       </div>
+      {webhookUrl && (
+        <p className="webhook-label" style={{ marginTop: 6, wordBreak: "break-all" }}>
+          {webhookUrl}
+        </p>
+      )}
 
       <div className={`status-badge ${badgeClass}`}>{scanStatus}</div>
 

@@ -4,6 +4,7 @@ import AgentLog from "./components/AgentLog";
 import AttackPanel from "./components/AttackPanel";
 import BreachAlert from "./components/BreachAlert";
 import JournalView from "./components/JournalView";
+import RemediationPanel from "./components/RemediationPanel";
 import StatusBar from "./components/StatusBar";
 
 function statusToLabel(status) {
@@ -29,6 +30,7 @@ export default function App() {
   const [breachTrigger, setBreachTrigger] = useState(0);
   const [currentAgent, setCurrentAgent] = useState("—");
   const [phase, setPhase] = useState("STANDBY");
+  const [remediation, setRemediation] = useState({ status: "idle" });
 
   const wsRef = useRef(null);
   const pollRef = useRef(null);
@@ -59,11 +61,24 @@ export default function App() {
         setWebhookConnected(data.ngrok_connected);
       }
       if (data.status === "running") setPhase("RED SWARM ACTIVE");
-      else if (data.status === "breached") setPhase("BREACH");
-      else if (data.status === "failed") setPhase("EXHAUSTED");
+      else if (data.status === "breached") {
+        if (data.remediation_status === "running") setPhase("BLUE SWARM");
+        else if (data.remediation_status === "complete") setPhase("REMEDIATED");
+        else setPhase("BREACH");
+      } else if (data.status === "failed") setPhase("EXHAUSTED");
       else setPhase("STANDBY");
     } catch (err) {
       console.error("[App] status fetch failed:", err);
+    }
+  }, []);
+
+  const fetchRemediation = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/remediation`);
+      const data = await res.json();
+      setRemediation(data);
+    } catch (err) {
+      console.error("[App] remediation fetch failed:", err);
     }
   }, []);
 
@@ -96,6 +111,10 @@ export default function App() {
       if (data.agent === "ALPHA") setPhase("RECON");
       if (data.agent === "BETA") setPhase("EXPLOIT");
       if (data.agent === "GAMMA") setPhase("ANALYSIS");
+      if (data.agent === "DELTA") setPhase("BLUE — DIAGNOSIS");
+      if (data.agent === "EPSILON") setPhase("BLUE — PATCH");
+      if (data.agent === "ZETA") setPhase("BLUE — VERIFY");
+      if (data.level === "success" && data.agent === "ZETA") setPhase("REMEDIATED");
     } catch (err) {
       console.error("[App] ws parse error:", err);
     }
@@ -139,18 +158,21 @@ export default function App() {
   useEffect(() => {
     if (isScanning || rawStatus === "breached") {
       fetchJournal();
+      fetchRemediation();
       pollRef.current = setInterval(() => {
         fetchJournal();
+        fetchRemediation();
         fetchStatus();
       }, 3000);
     } else {
       fetchJournal();
+      fetchRemediation();
     }
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [isScanning, rawStatus, fetchJournal, fetchStatus]);
+  }, [isScanning, rawStatus, fetchJournal, fetchRemediation, fetchStatus]);
 
   const handleLaunch = async () => {
     console.log("[App] launching attack:", targetUrl, vulnLabel);
@@ -159,6 +181,7 @@ export default function App() {
     setScanStatus("SCANNING");
     setRawStatus("running");
     setPhase("RED SWARM ACTIVE");
+    setRemediation({ status: "idle" });
 
     try {
       const res = await fetch(`${API_BASE}/scan`, {
@@ -220,9 +243,19 @@ export default function App() {
           <AgentLog messages={messages} />
         </main>
 
-        <aside className="panel panel-right">
-          <h2 className="panel-title">ATTACK JOURNAL</h2>
-          <JournalView entries={journalEntries} />
+        <aside className="panel panel-right panel-right-stack">
+          <div className="panel-right-journal">
+            <h2 className="panel-title">ATTACK JOURNAL</h2>
+            <JournalView entries={journalEntries} />
+          </div>
+          <RemediationPanel
+            remediation={remediation}
+            visible={
+              rawStatus === "breached" ||
+              remediation.status === "running" ||
+              remediation.status === "complete"
+            }
+          />
         </aside>
       </div>
     </div>

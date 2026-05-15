@@ -5,6 +5,7 @@ from typing import Awaitable, Callable, Literal
 from agents.alpha import run_alpha
 from agents.beta import run_beta
 from agents.gamma import run_gamma
+from blue_orchestrator import run_blue_swarm
 from journal import AttackJournal, LOGS_DIR
 from target_intel import is_fast_scan
 from tools.file_ops import write_log
@@ -143,6 +144,24 @@ async def run_scan(
                 "SYSTEM",
                 "breach",
             )
+
+            blue_span = trace_step(
+                workflow_id,
+                "BLUE_SWARM",
+                beta_span,
+                {"scan_id": scan_id},
+                "started",
+            )
+            await run_blue_swarm(
+                scan_id,
+                target_url,
+                vuln_type,
+                journal,
+                broadcast_fn,
+                workflow_id,
+                blue_span,
+            )
+
             outcome = "breached"
             end_workflow(workflow_id, outcome)
             return outcome

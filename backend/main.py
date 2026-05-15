@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from journal import journal
 from ngrok_check import get_ngrok_status
 from orchestrator import run_scan
+from remediation import remediation
 from tracing import ensure_initialized, get_active_execution_id, is_enabled as tracing_enabled
 from webhook_utils import verify_github_signature
 
@@ -68,6 +69,7 @@ async def _execute_scan(
 ) -> None:
     scan_state["status"] = "running"
     scan_state["scan_id"] = scan_id
+    remediation.reset()
 
     try:
         outcome = await run_scan(
@@ -112,7 +114,13 @@ async def get_status():
         "ngrok_connected": ngrok["ngrok_connected"],
         "omium_tracing": tracing_enabled(),
         "omium_execution_id": get_active_execution_id(),
+        "remediation_status": remediation.to_dict().get("status", "idle"),
     }
+
+
+@app.get("/remediation")
+async def get_remediation():
+    return remediation.to_dict()
 
 
 @app.get("/journal")

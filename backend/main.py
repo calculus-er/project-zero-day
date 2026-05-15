@@ -6,6 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+
+BACKEND_DIR = Path(__file__).resolve().parent
+ROOT_DIR = BACKEND_DIR.parent
+
+# Load .env BEFORE project imports so Omium/Groq keys are available at init
+load_dotenv(ROOT_DIR / ".env")
+load_dotenv(BACKEND_DIR / ".env", override=True)
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -13,14 +21,10 @@ from pydantic import BaseModel
 from journal import journal
 from ngrok_check import get_ngrok_status
 from orchestrator import run_scan
+from tracing import ensure_initialized, get_active_execution_id, is_enabled as tracing_enabled
 from webhook_utils import verify_github_signature
 
-BACKEND_DIR = Path(__file__).resolve().parent
-ROOT_DIR = BACKEND_DIR.parent
-
-# Supports .env at project root and/or backend/.env (backend wins on duplicate keys)
-load_dotenv(ROOT_DIR / ".env")
-load_dotenv(BACKEND_DIR / ".env", override=True)
+ensure_initialized()
 
 app = FastAPI(title="Project Zero-Day")
 
@@ -59,12 +63,16 @@ class ScanRequest(BaseModel):
     vuln_type: str = "sqli"
 
 
-async def _execute_scan(scan_id: str, target_url: str, vuln_type: str) -> None:
+async def _execute_scan(
+    scan_id: str, target_url: str, vuln_type: str, trigger: str = "manual"
+) -> None:
     scan_state["status"] = "running"
     scan_state["scan_id"] = scan_id
 
     try:
-        outcome = await run_scan(scan_id, target_url, vuln_type, send_update, journal)
+        outcome = await run_scan(
+            scan_id, target_url, vuln_type, send_update, journal, trigger=trigger
+        )
         if outcome == "breached":
             scan_state["status"] = "breached"
         elif outcome == "failed":
@@ -82,7 +90,7 @@ def _start_scan(background_tasks: BackgroundTasks, target_url: str, vuln_type: s
 
     scan_id = str(uuid.uuid4())
     scan_state["scan_id"] = scan_id
-    background_tasks.add_task(_execute_scan, scan_id, target_url, vuln_type)
+    background_tasks.add_task(_execute_scan, scan_id, target_url, vuln_type, "manual")
     return {"status": "started", "scan_id": scan_id}
 
 
@@ -102,6 +110,8 @@ async def get_status():
         "status": scan_state["status"],
         "scan_id": scan_state["scan_id"],
         "ngrok_connected": ngrok["ngrok_connected"],
+        "omium_tracing": tracing_enabled(),
+        "omium_execution_id": get_active_execution_id(),
     }
 
 
@@ -145,8 +155,15 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
         "info",
     )
 
-    result = _start_scan(background_tasks, target_url, vuln_type)
-    return {"status": "accepted", **result}
+    scan_id = str(uuid.uuid4())
+    if scan_state["status"] == "running":
+        return {"status": "already_running", "scan_id": scan_state["scan_id"]}
+
+    scan_state["scan_id"] = scan_id
+    background_tasks.add_task(
+        _execute_scan, scan_id, target_url, vuln_type, "github_webhook"
+    )
+    return {"status": "accepted", "scan_id": scan_id, "started": True}
 
 
 @app.websocket("/ws")

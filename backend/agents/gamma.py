@@ -1,4 +1,4 @@
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Optional
 
 from journal import AttackJournal
 from llm import groq_complete
@@ -13,6 +13,8 @@ async def run_gamma(
     vuln_type: str,
     journal: AttackJournal,
     broadcast_fn: BroadcastFn,
+    workflow_id: str = "",
+    parent_span_id: Optional[str] = None,
 ) -> str:
     summary = summarize_response(response)
 

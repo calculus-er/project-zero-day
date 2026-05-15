@@ -1,0 +1,16 @@
+# Omium project — run: omium project push (from repo root)
+# Set OMIUM_WORKFLOW_ID in backend/.env if auto-detect by project name fails.
+
+[project]
+name = "zero-day"
+version = "0.1.0"
+description = "Project Zero-Day autonomous red swarm"
+
+[execution]
+api_url = "https://api.omium.ai/api/v1"
+
+[tracing]
+enabled = true
+
+[workflows]
+directory = "./workflows"

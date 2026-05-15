@@ -1,11 +1,11 @@
 import asyncio
 import json
 import re
-from typing import Any, Awaitable, Callable
+from typing import Any, Awaitable, Callable, Optional
 
 from journal import AttackJournal
 from llm import groq_complete
-from target_intel import get_attack_surface
+from target_intel import get_attack_surface, is_fast_scan
 from tools.web_search import search_exploits
 
 BroadcastFn = Callable[[str, str, str], Awaitable[None]]
@@ -38,6 +38,8 @@ async def run_alpha(
     vuln_type: str,
     journal: AttackJournal,
     broadcast_fn: BroadcastFn,
+    workflow_id: str = "",
+    parent_span_id: Optional[str] = None,
 ) -> dict[str, Any]:
     await broadcast_fn(
         f"Alpha: Starting recon on {target_url} for {vuln_type}",
@@ -59,12 +61,18 @@ async def run_alpha(
 
     raw = await groq_complete(system_prompt, user_prompt)
     queries = _parse_queries(raw)
+    search_count = 2 if is_fast_scan() else 3
+    queries = queries[:search_count]
+    pause = 1.0 if is_fast_scan() else 2.0
 
     all_snippets: list[str] = []
-    for query in queries:
-        snippets = await search_exploits(query, broadcast_fn)
+    for index, query in enumerate(queries, start=1):
+        snippets = await search_exploits(
+            query, broadcast_fn, workflow_id, parent_span_id, index
+        )
         all_snippets.extend(snippets)
-        await asyncio.sleep(2)
+        if index < len(queries):
+            await asyncio.sleep(pause)
 
     await broadcast_fn(
         f"Alpha: Recon complete. Found {len(all_snippets)} intelligence sources.",

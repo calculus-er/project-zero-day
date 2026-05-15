@@ -2,15 +2,29 @@ import asyncio
 import os
 from typing import Awaitable, Callable, Optional
 
+from tracing import trace_step
+
 BroadcastFn = Optional[Callable[[str, str, str], Awaitable[None]]]
 
 
 async def search_exploits(
     query: str,
     broadcast_fn: BroadcastFn = None,
+    workflow_id: str = "",
+    parent_span_id: Optional[str] = None,
+    search_index: int = 0,
 ) -> list[str]:
     if broadcast_fn:
         await broadcast_fn(f"Alpha: Searching for — {query}", "ALPHA", "thinking")
+
+    if workflow_id and search_index:
+        trace_step(
+            workflow_id,
+            f"WEB_SEARCH_{search_index}",
+            parent_span_id,
+            {"query": query},
+            "started",
+        )
 
     try:
         from tavily import TavilyClient

@@ -1,5 +1,7 @@
 """Exact attack surface for the Zero-Day arena — keeps agents on-target."""
 
+import os
+
 ATTACK_SURFACE: dict[str, str] = {
     "sqli": """
 TARGET ARCHITECTURE (read carefully):
@@ -14,6 +16,7 @@ TARGET ARCHITECTURE (read carefully):
 - Proven working examples for this exact target:
   ' OR '1'='1' --
   ' OR 1=1--
+  ' OR 1=1/*
   admin'--
 """,
     "cmdi": """
@@ -31,13 +34,18 @@ TARGET ARCHITECTURE (read carefully):
 """,
 }
 
-# Rotating seeds when LLM output is off-target (attempt 1..4)
-SEED_PAYLOADS: dict[str, list[str]] = {
+# Attempt 1 = benign probe (fails — better demo pacing). Attempts 2–4 = real exploits.
+DECOY_PAYLOADS: dict[str, str] = {
+    "sqli": "guest",
+    "cmdi": "127.0.0.1",
+}
+
+BREACH_SEEDS: dict[str, list[str]] = {
     "sqli": [
         "' OR '1'='1' --",
         "' OR 1=1--",
+        "' OR 1=1/*",
         "admin'--",
-        "' OR 'x'='x'--",
     ],
     "cmdi": [
         "127.0.0.1 & echo HACKED",
@@ -54,7 +62,18 @@ def get_attack_surface(vuln_type: str, target_url: str) -> str:
 
 
 def get_seed_payload(vuln_type: str, attempt: int) -> str:
-    seeds = SEED_PAYLOADS.get(vuln_type, [])
+    if attempt <= 1:
+        return DECOY_PAYLOADS.get(vuln_type, "guest")
+
+    seeds = BREACH_SEEDS.get(vuln_type, [])
     if not seeds:
         return ""
-    return seeds[(attempt - 1) % len(seeds)]
+    return seeds[(attempt - 2) % len(seeds)]
+
+
+def is_fast_scan() -> bool:
+    return os.getenv("SCAN_FAST_MODE", "false").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+    )

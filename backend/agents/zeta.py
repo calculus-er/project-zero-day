@@ -12,6 +12,7 @@ async def run_zeta(
     broadcast_fn: BroadcastFn,
     workflow_id: str = "",
     parent_span_id: Optional[str] = None,
+    scan_id: str = "",
 ) -> dict[str, Any]:
     await broadcast_fn(
         f"Zeta: Re-testing winning payload `{winning_payload[:60]}`…",
@@ -47,7 +48,7 @@ async def run_zeta(
             "error",
         )
 
-    live = await verify_live_target(target_url, vuln_type, winning_payload)
+    live = await verify_live_target(target_url, vuln_type, winning_payload, scan_id)
 
     if live["still_breach"]:
         await broadcast_fn(

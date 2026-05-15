@@ -5,8 +5,10 @@ from typing import Any, Awaitable, Callable, Optional
 
 from journal import AttackJournal
 from llm import groq_complete
-from target_intel import get_attack_surface, is_fast_scan
+from target_analyzer import analyze_and_store_profile
+from target_intel import get_prompt_attack_surface, is_fast_scan
 from tools.web_search import search_exploits
+from tracing import trace_step
 
 BroadcastFn = Callable[[str, str, str], Awaitable[None]]
 
@@ -40,6 +42,7 @@ async def run_alpha(
     broadcast_fn: BroadcastFn,
     workflow_id: str = "",
     parent_span_id: Optional[str] = None,
+    scan_id: str = "",
 ) -> dict[str, Any]:
     await broadcast_fn(
         f"Alpha: Starting recon on {target_url} for {vuln_type}",
@@ -47,13 +50,24 @@ async def run_alpha(
         "info",
     )
 
+    if scan_id and workflow_id:
+        trace_step(
+            workflow_id,
+            "ALPHA_PROFILE",
+            parent_span_id,
+            {"scan_id": scan_id},
+            "started",
+        )
+    if scan_id:
+        await analyze_and_store_profile(scan_id, vuln_type, broadcast_fn)
+
     system_prompt = (
         "You are Alpha, an elite reconnaissance agent. Given a target URL and "
         "vulnerability type, generate 3 specific, targeted web search queries to "
         "find real PoC payloads and bypass techniques for this exact environment. "
         "Output ONLY a JSON array of 3 search query strings, nothing else."
     )
-    surface = get_attack_surface(vuln_type, target_url)
+    surface = get_prompt_attack_surface(scan_id or None, vuln_type, target_url)
     user_prompt = (
         f"Target URL: {target_url}\nVulnerability type: {vuln_type}\n\n{surface}\n"
         "Search for payloads that match this exact JSON POST injection point."

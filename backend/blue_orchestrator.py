@@ -92,6 +92,7 @@ async def run_blue_swarm(
             broadcast_fn,
             workflow_id,
             zeta_span,
+            scan_id,
         )
     except Exception as exc:
         remediation.fail(str(exc))

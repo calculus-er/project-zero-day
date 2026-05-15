@@ -58,7 +58,13 @@ async def run_scan(
 
     try:
         alpha_data = await run_alpha(
-            target_url, vuln_type, journal, broadcast_fn, workflow_id, alpha_span
+            target_url,
+            vuln_type,
+            journal,
+            broadcast_fn,
+            workflow_id,
+            alpha_span,
+            scan_id,
         )
     except Exception as exc:
         await broadcast_fn(f"Alpha failed: {exc}", "ALPHA", "error")
@@ -87,6 +93,7 @@ async def run_scan(
                 attempt=attempt,
                 workflow_id=workflow_id,
                 parent_span_id=beta_span,
+                scan_id=scan_id,
             )
         except Exception as exc:
             await broadcast_fn(f"Beta failed: {exc}", "BETA", "error")

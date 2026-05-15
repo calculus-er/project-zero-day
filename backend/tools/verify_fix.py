@@ -144,10 +144,15 @@ def verify_patch_logic(vuln_type: str, payload: str) -> dict[str, Any]:
 
 
 async def verify_live_target(
-    target_url: str, vuln_type: str, payload: str
+    target_url: str, vuln_type: str, payload: str, scan_id: str = ""
 ) -> dict[str, Any]:
     """Re-fire the winning payload at the running arena (still vulnerable until deploy)."""
-    response = await fire_payload(target_url.rstrip("/"), vuln_type.lower(), payload)
+    response = await fire_payload(
+        target_url.rstrip("/"),
+        vuln_type.lower(),
+        payload,
+        scan_id=scan_id,
+    )
     return {
         "still_breach": response.get("is_breach", False),
         "status_code": response.get("status_code", 0),

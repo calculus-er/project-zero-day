@@ -3,7 +3,7 @@ from typing import Any, Awaitable, Callable, Optional
 
 from journal import AttackJournal
 from llm import groq_complete
-from target_intel import get_attack_surface, get_seed_payload
+from target_intel import get_prompt_attack_surface, get_seed_payload
 from tools.http_exploit import fire_payload
 
 BroadcastFn = Callable[[str, str, str], Awaitable[None]]
@@ -93,9 +93,10 @@ def _pick_payload(
     vuln_type: str,
     attempt: int,
     journal: AttackJournal,
+    scan_id: str = "",
 ) -> tuple[str, bool]:
     """Returns (payload, used_seed_fallback)."""
-    seed = get_seed_payload(vuln_type, attempt)
+    seed = get_seed_payload(vuln_type, attempt, scan_id or None)
     cleaned = _clean_payload(raw_payload, vuln_type)
 
     if _is_absurd_payload(cleaned, vuln_type):
@@ -117,33 +118,11 @@ async def run_beta(
     attempt: int = 1,
     workflow_id: str = "",
     parent_span_id: Optional[str] = None,
+    scan_id: str = "",
 ) -> dict[str, Any]:
     intel = "\n".join(alpha_results[:8]) if alpha_results else "No recon results."
-    surface = get_attack_surface(vuln_type, target_url)
-    seed = get_seed_payload(vuln_type, attempt)
-
-    # Attempt 1 = benign probe so the demo shows failure → Gamma → then real breach
-    if attempt == 1:
-        payload = get_seed_payload(vuln_type, 1)
-        await broadcast_fn(
-            f"Beta: Probe strike (attempt 1) → {payload}",
-            "BETA",
-            "thinking",
-        )
-        response = await fire_payload(
-            target_url,
-            vuln_type,
-            payload,
-            broadcast_fn,
-            workflow_id=workflow_id,
-            parent_span_id=parent_span_id,
-        )
-        await broadcast_fn(
-            f"Beta: Response received — Status {response.get('status_code', 0)}",
-            "BETA",
-            "info",
-        )
-        return {"payload": payload, "response": response}
+    surface = get_prompt_attack_surface(scan_id or None, vuln_type, target_url)
+    seed = get_seed_payload(vuln_type, attempt, scan_id or None)
 
     system_prompt = (
         "You are Beta, an elite exploitation agent.\n"
@@ -164,7 +143,7 @@ async def run_beta(
     )
 
     raw_payload = await groq_complete(system_prompt, user_prompt)
-    payload, used_seed = _pick_payload(raw_payload, vuln_type, attempt, journal)
+    payload, used_seed = _pick_payload(raw_payload, vuln_type, attempt, journal, scan_id)
 
     if used_seed:
         await broadcast_fn(
@@ -182,6 +161,7 @@ async def run_beta(
         broadcast_fn,
         workflow_id=workflow_id,
         parent_span_id=parent_span_id,
+        scan_id=scan_id,
     )
     await broadcast_fn(
         f"Beta: Response received — Status {response.get('status_code', 0)}",

@@ -1,6 +1,25 @@
-"""Exact attack surface for the Zero-Day arena — keeps agents on-target."""
+"""Attack surface helpers — static fallback + dynamic profile (Phase 8B)."""
 
 import os
+
+from target_profile import get_profile
+
+DEFAULT_SQLI_MARKERS: tuple[str, ...] = (
+    "admin",
+    "alice",
+    "supersecret",
+    "hunter2",
+    '"users"',
+)
+
+DEFAULT_CMDI_MARKERS: tuple[str, ...] = (
+    "HACKED",
+    "Volume",
+    "Directory",
+    "PING",
+    "ping",
+    "bytes=",
+)
 
 ATTACK_SURFACE: dict[str, str] = {
     "sqli": """
@@ -34,12 +53,6 @@ TARGET ARCHITECTURE (read carefully):
 """,
 }
 
-# Attempt 1 = benign probe (fails — better demo pacing). Attempts 2–4 = real exploits.
-DECOY_PAYLOADS: dict[str, str] = {
-    "sqli": "guest",
-    "cmdi": "127.0.0.1",
-}
-
 BREACH_SEEDS: dict[str, list[str]] = {
     "sqli": [
         "' OR '1'='1' --",
@@ -61,14 +74,28 @@ def get_attack_surface(vuln_type: str, target_url: str) -> str:
     return template.replace("{base}", target_url.rstrip("/"))
 
 
-def get_seed_payload(vuln_type: str, attempt: int) -> str:
-    if attempt <= 1:
-        return DECOY_PAYLOADS.get(vuln_type, "guest")
+def get_prompt_attack_surface(scan_id: str | None, vuln_type: str, target_url: str) -> str:
+    """Prefer dynamic profile text from Alpha analysis; else static template."""
+    if scan_id:
+        profile = get_profile(scan_id)
+        if profile and profile.attack_surface_text.strip():
+            return profile.attack_surface_text.replace(
+                "{base}", target_url.rstrip("/")
+            )
+    return get_attack_surface(vuln_type, target_url)
 
+
+def get_seed_payload(vuln_type: str, attempt: int, scan_id: str | None = None) -> str:
+    """Pure runs: attempt 1 uses first real seed (no decoy)."""
+    if scan_id:
+        profile = get_profile(scan_id)
+        if profile and profile.seed_payloads:
+            seeds = profile.seed_payloads
+            return seeds[(attempt - 1) % len(seeds)]
     seeds = BREACH_SEEDS.get(vuln_type, [])
     if not seeds:
         return ""
-    return seeds[(attempt - 2) % len(seeds)]
+    return seeds[(attempt - 1) % len(seeds)]
 
 
 def is_fast_scan() -> bool:

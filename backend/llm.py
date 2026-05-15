@@ -39,7 +39,9 @@ async def _enforce_rate_limit() -> None:
         _last_call_at = time.monotonic()
 
 
-def _sync_chat(system_prompt: str, user_prompt: str, model: str) -> str:
+def _sync_chat(
+    system_prompt: str, user_prompt: str, model: str, max_tokens: int = 1024
+) -> str:
     client = _get_client()
     response = client.chat.completions.create(
         model=model,
@@ -48,7 +50,7 @@ def _sync_chat(system_prompt: str, user_prompt: str, model: str) -> str:
             {"role": "user", "content": user_prompt},
         ],
         temperature=0.4,
-        max_tokens=1024,
+        max_tokens=max_tokens,
     )
     return (response.choices[0].message.content or "").strip()
 
@@ -72,10 +74,16 @@ def _is_rate_limited(exc: Exception) -> bool:
     return "429" in text or "rate" in text or "503" in text
 
 
-async def groq_complete(system_prompt: str, user_prompt: str) -> str:
+async def groq_complete(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    max_tokens: int | None = None,
+) -> str:
     """Groq chat with 2s spacing, backoff on rate limits, fallback model on 400s."""
     await _enforce_rate_limit()
 
+    tok = max_tokens if max_tokens is not None else 1024
     models = [PRIMARY_MODEL, FALLBACK_MODEL]
     last_error: Optional[Exception] = None
 
@@ -83,7 +91,7 @@ async def groq_complete(system_prompt: str, user_prompt: str) -> str:
         for attempt in range(MAX_RETRIES):
             try:
                 return await asyncio.to_thread(
-                    _sync_chat, system_prompt, user_prompt, model
+                    _sync_chat, system_prompt, user_prompt, model, tok
                 )
             except Exception as exc:
                 last_error = exc

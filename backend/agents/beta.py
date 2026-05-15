@@ -109,6 +109,23 @@ def _pick_payload(
     return cleaned, False
 
 
+def _beta_rules(vuln_type: str) -> str:
+    vt = vuln_type.lower().strip()
+    if vt == "cmdi":
+        return (
+            f"- Payload MUST be under {MAX_PAYLOAD_LEN} characters.\n"
+            "- Command injection: the JSON value is joined into a shell ping command.\n"
+            "- Use shell chaining: & | or ; with a harmless marker (e.g. echo HACKED).\n"
+            "- Output ONLY the raw host/payload value — no key=value or JSON.\n"
+        )
+    return (
+        f"- Payload MUST be under {MAX_PAYLOAD_LEN} characters.\n"
+        "- Use ONLY simple SQLite login-bypass strings (quotes, OR, -- or /* comments).\n"
+        "- NEVER use JSON_EXTRACT, UNION SELECT, SLEEP, WAITFOR, or nested functions.\n"
+        "- Output ONLY the raw payload — no JSON keys, no explanation.\n"
+    )
+
+
 async def run_beta(
     target_url: str,
     vuln_type: str,
@@ -123,6 +140,7 @@ async def run_beta(
     intel = "\n".join(alpha_results[:8]) if alpha_results else "No recon results."
     surface = get_prompt_attack_surface(scan_id or None, vuln_type, target_url)
     seed = get_seed_payload(vuln_type, attempt, scan_id or None)
+    rules = _beta_rules(vuln_type)
 
     system_prompt = (
         "You are Beta, an elite exploitation agent.\n"
@@ -130,16 +148,13 @@ async def run_beta(
         "ATTACK JOURNAL (everything tried so far — do NOT repeat any of these):\n"
         f"{journal.get_context_string()}\n"
         "RULES:\n"
-        f"- Payload MUST be under {MAX_PAYLOAD_LEN} characters.\n"
-        "- Use ONLY simple SQLite login-bypass strings (quotes, OR, -- or /* comments).\n"
-        "- NEVER use JSON_EXTRACT, UNION SELECT, SLEEP, WAITFOR, or nested functions.\n"
-        "- Output ONLY the raw payload — no JSON keys, no explanation.\n"
-        "Your task: Generate exactly ONE new payload for the username/host field only."
+        f"{rules}"
+        "Your task: Generate exactly ONE new payload for the injection field in the surface above."
     )
     user_prompt = (
         f"Attempt: {attempt}\n"
         f"Recon (summary):\n{intel}\n\n"
-        f"Proven payload for this attempt if stuck: {seed}"
+        f"Seed if stuck: {seed}"
     )
 
     raw_payload = await groq_complete(system_prompt, user_prompt)
@@ -147,7 +162,7 @@ async def run_beta(
 
     if used_seed:
         await broadcast_fn(
-            f"Beta: Invalid LLM payload blocked — using arena seed → {payload}",
+            f"Beta: Invalid LLM payload blocked — using profile/arena seed → {payload}",
             "BETA",
             "info",
         )

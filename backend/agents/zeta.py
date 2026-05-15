@@ -52,7 +52,8 @@ async def run_zeta(
 
     if live["still_breach"]:
         await broadcast_fn(
-            "Zeta: Live arena still exploitable (patch file not deployed to Docker yet)",
+            "Zeta: Live HTTP still breaches — run `docker compose restart target` "
+            "to reload arena/source/app.py (mounted volume).",
             "ZETA",
             "info",
         )

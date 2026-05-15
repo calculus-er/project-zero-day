@@ -11,8 +11,8 @@ def build_remediation(vuln_type: str, winning_payload: str) -> dict[str, Any]:
 
 
 def _sqli_patch(winning_payload: str) -> dict[str, Any]:
-    diff = f"""--- target/app.py (vulnerable)
-+++ target/app.py (remediated)
+    diff = f"""--- arena/source/app.py (vulnerable)
++++ arena/source/app.py (remediated)
 @@ login() — string concatenation SQLi
 -    query = (
 -        "SELECT * FROM users WHERE username='"
@@ -61,13 +61,13 @@ def login():
             "The winning payload becomes literal data, not executable SQL."
         ),
         "cwe": "CWE-89",
-        "file_hint": "target/app.py — login()",
+        "file_hint": "arena/source/app.py — login()",
     }
 
 
 def _cmdi_patch(winning_payload: str) -> dict[str, Any]:
-    diff = f"""--- target/app.py (vulnerable)
-+++ target/app.py (remediated)
+    diff = f"""--- arena/source/app.py (vulnerable)
++++ arena/source/app.py (remediated)
 @@ ping() — shell injection via os.popen
 -    cmd = "ping -n 1 " + host   # or ping -c 1 on Linux
 -    with os.popen(cmd) as proc:
@@ -93,5 +93,5 @@ def _cmdi_patch(winning_payload: str) -> dict[str, Any]:
             "fixed argv list — never concatenate user input into shell commands."
         ),
         "cwe": "CWE-78",
-        "file_hint": "target/app.py — ping()",
+        "file_hint": "arena/source/app.py — ping()",
     }

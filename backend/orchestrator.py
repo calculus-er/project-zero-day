@@ -190,6 +190,8 @@ async def run_scan(
                 broadcast_fn,
                 workflow_id=workflow_id,
                 parent_span_id=gamma_span,
+                target_url=target_url,
+                scan_id=scan_id,
             )
         except Exception as exc:
             critique = f"Gamma unavailable: {exc}"

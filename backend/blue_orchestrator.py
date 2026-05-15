@@ -106,8 +106,9 @@ async def run_blue_swarm(
 
     if live_still:
         note = (
-            "Patch logic blocks the exploit in simulation. "
-            "Live arena still vulnerable until you apply the patch and rebuild Docker."
+            "Arena file on disk was updated; restart the target container "
+            "(`docker compose restart target`) so the live server loads the fix. "
+            "Logic simulation confirms the exploit class is blocked."
         )
     else:
         note = "Patch verified — winning payload blocked in simulation and on live target."
@@ -122,6 +123,8 @@ async def run_blue_swarm(
         logic_verified=logic_ok,
         live_still_vulnerable=live_still,
         verification_note=note,
+        used_template_fallback=bool(epsilon_result.get("used_template_fallback")),
+        arena_source_path=epsilon_result.get("arena_source_path"),
     )
 
     trace_step(

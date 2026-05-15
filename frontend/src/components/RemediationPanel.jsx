@@ -45,7 +45,16 @@ export default function RemediationPanel({ remediation, visible }) {
       <p className="remediation-text">{remediation.fix_summary}</p>
       <p className="remediation-label">Payload</p>
       <pre className="remediation-code">{remediation.winning_payload}</pre>
-      <p className="remediation-label">Verification (Zeta)</p>
+      {remediation.used_template_fallback && (
+        <p className="remediation-verify remediation-verify--live">
+          Patched with deterministic template fallback (LLM rewrite failed validation).
+        </p>
+      )}
+      {remediation.arena_source_path && (
+        <p className="remediation-meta">
+          Written: <code>{remediation.arena_source_path}</code>
+        </p>
+      )}
       <p
         className={
           remediation.logic_verified

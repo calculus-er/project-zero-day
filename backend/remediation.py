@@ -24,6 +24,8 @@ class RemediationStore:
             "verification_note": None,
             "used_template_fallback": False,
             "arena_source_path": None,
+            "target_restarted": False,
+            "target_health_ok": None,
         }
 
     def start(self, scan_id: str, vuln_type: str, winning_payload: str) -> None:
@@ -43,6 +45,8 @@ class RemediationStore:
             "verification_note": None,
             "used_template_fallback": False,
             "arena_source_path": None,
+            "target_restarted": False,
+            "target_health_ok": None,
         }
 
     def complete(
@@ -58,6 +62,8 @@ class RemediationStore:
         verification_note: str = "",
         used_template_fallback: bool = False,
         arena_source_path: str | None = None,
+        target_restarted: bool = False,
+        target_health_ok: bool | None = None,
     ) -> None:
         self._data["status"] = "complete"
         self._data["diagnosis"] = diagnosis
@@ -71,6 +77,8 @@ class RemediationStore:
         self._data["verification_note"] = verification_note
         self._data["used_template_fallback"] = used_template_fallback
         self._data["arena_source_path"] = arena_source_path
+        self._data["target_restarted"] = target_restarted
+        self._data["target_health_ok"] = target_health_ok
 
     def fail(self, message: str) -> None:
         self._data["status"] = "failed"

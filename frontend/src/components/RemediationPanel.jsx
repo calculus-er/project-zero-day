@@ -55,6 +55,20 @@ export default function RemediationPanel({ remediation, visible }) {
           Written: <code>{remediation.arena_source_path}</code>
         </p>
       )}
+      {remediation.logic_verified && (
+        <p className="remediation-meta">
+          Compose:{" "}
+          {remediation.target_restarted
+            ? "`docker compose restart` ran"
+            : "no successful restart (disabled or compose error — see feed)"}
+          {" · "}
+          {remediation.target_health_ok === true
+            ? "/health OK"
+            : remediation.target_health_ok === false
+              ? "/health timed out"
+              : "/health not polled"}
+        </p>
+      )}
       <p
         className={
           remediation.logic_verified

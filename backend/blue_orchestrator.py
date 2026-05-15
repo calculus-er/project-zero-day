@@ -103,15 +103,42 @@ async def run_blue_swarm(
     live = zeta_result.get("live", {})
     logic_ok = bool(logic.get("logic_ok"))
     live_still = bool(live.get("still_breach"))
+    target_restarted = bool(zeta_result.get("target_restarted"))
+    target_health_ok = zeta_result.get("target_health_ok")
 
     if live_still:
-        note = (
-            "Arena file on disk was updated; restart the target container "
-            "(`docker compose restart target`) so the live server loads the fix. "
-            "Logic simulation confirms the exploit class is blocked."
-        )
+        if target_restarted and target_health_ok is True:
+            note = (
+                "Container was restarted and /health responded, but the live HTTP "
+                "exploit probe still reports success — check breach markers, profile "
+                "field mapping, or whether the running container matches the patched file."
+            )
+        elif target_restarted and target_health_ok is False:
+            note = (
+                "`docker compose restart` ran but /health did not recover before the "
+                "timeout — inspect container logs. The arena file on disk was still updated."
+            )
+        elif target_restarted:
+            note = (
+                "Restart completed; live check still shows a breach — verify Docker and "
+                "mount paths."
+            )
+        else:
+            note = (
+                "Arena file on disk was updated; automatic container restart did not run "
+                "or failed — run `docker compose restart target` so the live server loads "
+                "the fix. Logic simulation confirms the exploit class is blocked."
+            )
     else:
-        note = "Patch verified — winning payload blocked in simulation and on live target."
+        if target_restarted:
+            note = (
+                "Patch verified — Docker target was restarted, /health recovered, and "
+                "the live arena no longer accepts the winning exploit."
+            )
+        else:
+            note = (
+                "Patch verified — winning payload blocked in simulation and on live target."
+            )
 
     remediation.complete(
         diagnosis=delta_result.get("diagnosis", ""),
@@ -125,6 +152,8 @@ async def run_blue_swarm(
         verification_note=note,
         used_template_fallback=bool(epsilon_result.get("used_template_fallback")),
         arena_source_path=epsilon_result.get("arena_source_path"),
+        target_restarted=target_restarted,
+        target_health_ok=target_health_ok,
     )
 
     trace_step(

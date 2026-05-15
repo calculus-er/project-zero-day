@@ -107,19 +107,14 @@ def login():
     username = data.get("username", "")
     password = data.get("password", "")
 
-    query = (
-        "SELECT * FROM users WHERE username='"
-        + username
-        + "' AND password='"
-        + password
-        + "'"
-    )
-
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     try:
-        cursor.execute(query)
+        cursor.execute(
+            "SELECT * FROM users WHERE username=? AND password=?",
+            (username, password),
+        )
         rows = cursor.fetchall()
     except sqlite3.Error:
         conn.close()

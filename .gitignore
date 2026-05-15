@@ -30,9 +30,11 @@ logs/patches/
 logs/**/*.txt
 logs/**/*.json
 
-# Local DB from running target outside Docker
-target/arena.db
-target/*.db
+# Arena (Tier 1 mount — DB and backups on host)
+arena/source/*.db
+arena/source/*.bak*
+arena/source/__pycache__/
+
 
 # IDE / OS
 .vscode/

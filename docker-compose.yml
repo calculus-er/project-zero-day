@@ -3,4 +3,7 @@ services:
     build: ./target
     ports:
       - "5000:5000"
+    volumes:
+      # Tier 1: edit arena/source/app.py on the host; container runs it live.
+      - ./arena/source:/app
     restart: unless-stopped

@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from journal import journal
+from arena_util import get_arena_status
 from ngrok_check import get_ngrok_status
 from orchestrator import run_scan
 from remediation import remediation
@@ -94,6 +95,12 @@ def _start_scan(background_tasks: BackgroundTasks, target_url: str, vuln_type: s
     scan_state["scan_id"] = scan_id
     background_tasks.add_task(_execute_scan, scan_id, target_url, vuln_type, "manual")
     return {"status": "started", "scan_id": scan_id}
+
+
+@app.get("/arena/status")
+async def arena_status():
+    target_url = os.getenv("TARGET_URL", "http://localhost:5000")
+    return await get_arena_status(target_url)
 
 
 @app.get("/webhook/status")

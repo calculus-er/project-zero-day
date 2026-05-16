@@ -88,6 +88,14 @@ export default function RemediationPanel({ remediation, visible }) {
       {remediation.verification_note && (
         <p className="remediation-text">{remediation.verification_note}</p>
       )}
+      {remediation.pr_url && (
+        <p className="remediation-meta">
+          GitHub PR:{" "}
+          <a href={remediation.pr_url} target="_blank" rel="noreferrer">
+            {remediation.pr_url}
+          </a>
+        </p>
+      )}
       <p className="remediation-label">Patch file</p>
       <p className="remediation-meta">
         <code>logs/patches/{remediation.patch_filename}</code>

@@ -10,8 +10,6 @@ export default function AttackPanel({
   onLaunch,
   isScanning,
 }) {
-  console.log("[AttackPanel] scanStatus:", scanStatus, "scanning:", isScanning);
-
   const badgeClass = scanStatus.toLowerCase();
 
   return (

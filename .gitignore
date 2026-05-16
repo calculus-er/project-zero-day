@@ -30,11 +30,16 @@ logs/patches/
 logs/**/*.txt
 logs/**/*.json
 
+# Phase 9 demo clones
+.demo_repos/
+
 # Arena (Tier 1 mount — DB and backups on host)
 arena/source/*.db
 arena/source/*.bak*
 arena/source/__pycache__/
 
+# Local-only test scripts (use scripts/sync_incoming_to_app.py or Docker ARENA_INCOMING_SYNC)
+arena/incoming/*.py
 
 # IDE / OS
 .vscode/

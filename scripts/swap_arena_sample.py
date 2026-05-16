@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Phase 8F — Reset arena/source to a committed vulnerable sample: replace app.py,
-remove SQLite DB + Epsilon backups, optionally restart Docker target.
+Phase 8F — Reset arena/source to a committed vulnerable sample: replace the arena
+entry ``*.py`` (see ARENA_ENTRY_FILE / ``auto``), remove SQLite DB + Epsilon
+backups, optionally restart Docker target.
 
 Run from repo root:
   python scripts/swap_arena_sample.py
@@ -23,18 +24,22 @@ def repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def ensure_backend_import(root: Path) -> None:
+    sys.path.insert(0, str(root / "backend"))
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(root / ".env")
+    load_dotenv(root / "backend" / ".env", override=True)
+
+
 def default_sample_path(root: Path) -> Path:
     override = os.getenv("ARENA_RESET_SAMPLE", "").strip()
     if override:
         p = Path(override).expanduser()
         return p if p.is_absolute() else (root / p).resolve()
-    return (root / "arena" / "samples" / "tier1_vulnerable_app.py").resolve()
-
-
-def arena_source_dir(root: Path) -> Path:
-    rel = os.getenv("ARENA_SOURCE_DIR", "arena/source").strip()
-    p = Path(rel)
-    return p.resolve() if p.is_absolute() else (root / p).resolve()
+    return (root / "arena" / "samples" / "app.py").resolve()
 
 
 def remove_matching(dir_path: Path, desc: str, predicate, dry_run: bool) -> int:
@@ -68,14 +73,18 @@ def docker_compose_restart(root: Path, service: str, dry_run: bool) -> int:
 
 
 def main() -> int:
+    root = repo_root()
+    ensure_backend_import(root)
+    from arena_util import arena_app_path
+
     parser = argparse.ArgumentParser(
-        description="Swap arena/source/app.py to Tier-1 vulnerable sample and clean artifacts.",
+        description="Swap arena entry .py to Tier-1 vulnerable sample and clean artifacts.",
     )
     parser.add_argument(
         "--sample",
         type=Path,
         default=None,
-        help="Source .py file (default: arena/samples/tier1_vulnerable_app.py or ARENA_RESET_SAMPLE)",
+        help="Source .py file (default: arena/samples/app.py or ARENA_RESET_SAMPLE)",
     )
     parser.add_argument(
         "--no-clean-db",
@@ -85,7 +94,7 @@ def main() -> int:
     parser.add_argument(
         "--no-clean-backups",
         action="store_true",
-        help="Keep arena/source/app.bak.* from Epsilon",
+        help="Keep Epsilon backup files (*.*bak.*)",
     )
     parser.add_argument(
         "--restart",
@@ -104,10 +113,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    root = repo_root()
     sample = (args.sample.resolve() if args.sample else default_sample_path(root))
-    dest_dir = arena_source_dir(root)
-    dest_app = dest_dir / "app.py"
+    try:
+        dest_app = arena_app_path()
+    except RuntimeError as exc:
+        print(f"[swap] {exc}", file=sys.stderr)
+        return 1
+    dest_dir = dest_app.parent
 
     if not sample.is_file():
         print(f"Sample not found: {sample}", file=sys.stderr)
@@ -115,17 +127,16 @@ def main() -> int:
 
     dest_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"[swap] root        = {root}")
-    print(f"[swap] sample      = {sample}")
-    print(f"[swap] dest app.py = {dest_app}")
+    print(f"[swap] root     = {root}")
+    print(f"[swap] sample   = {sample}")
+    print(f"[swap] dest app = {dest_app}")
 
     if args.dry_run:
-        print("  (dry-run) copy sample -> app.py")
+        print(f"  (dry-run) copy sample -> {dest_app.name}")
     else:
         shutil.copy2(sample, dest_app)
-        print("  copied sample -> app.py")
+        print(f"  copied sample -> {dest_app.name}")
 
-    removed_db = 0
     if not args.no_clean_db:
 
         def is_db(p: Path) -> bool:
@@ -135,15 +146,14 @@ def main() -> int:
         if removed_db == 0:
             print("  (no .db files to remove)")
 
-    removed_bak = 0
     if not args.no_clean_backups:
 
         def is_bak(p: Path) -> bool:
-            return p.is_file() and p.name.startswith("app.bak.")
+            return p.is_file() and ".bak." in p.name
 
         removed_bak = remove_matching(dest_dir, "backup", is_bak, args.dry_run)
         if removed_bak == 0:
-            print("  (no app.bak.* to remove)")
+            print("  (no backup files to remove)")
 
     if args.restart:
         code = docker_compose_restart(root, args.service, args.dry_run)

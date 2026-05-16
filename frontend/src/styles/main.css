@@ -13,6 +13,13 @@ body,
   width: 100%;
 }
 
+:root {
+  --terminal-muted: #8ef0a8;
+  --terminal-dim: #6bdc8a;
+  --terminal-border: #2d8f52;
+  --terminal-border-soft: #1a5c36;
+}
+
 body {
   background: #000000;
   color: #00ff41;
@@ -37,7 +44,7 @@ body {
 
 *::-webkit-scrollbar-thumb {
   background: #00ff41;
-  border: 1px solid #003b00;
+  border: 1px solid var(--terminal-border-soft);
 }
 
 .war-room {
@@ -156,7 +163,7 @@ body {
 .terminal-label {
   display: block;
   font-size: 0.7rem;
-  color: #003b00;
+  color: var(--terminal-dim);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   margin-bottom: 4px;
@@ -242,7 +249,7 @@ body {
 
 .webhook-label {
   font-size: 0.65rem;
-  color: #003b00;
+  color: var(--terminal-dim);
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -258,8 +265,8 @@ body {
 }
 
 .status-badge.idle {
-  color: #003b00;
-  border-color: #003b00;
+  color: var(--terminal-dim);
+  border-color: var(--terminal-border);
 }
 
 .status-badge.scanning {
@@ -281,7 +288,7 @@ body {
 .status-bar {
   margin-top: 20px;
   padding-top: 12px;
-  border-top: 1px solid #003b00;
+  border-top: 1px solid var(--terminal-border-soft);
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -291,7 +298,7 @@ body {
   display: flex;
   justify-content: space-between;
   margin-bottom: 6px;
-  color: #003b00;
+  color: var(--terminal-muted);
 }
 
 .status-bar-row span.value {
@@ -315,7 +322,7 @@ body {
 }
 
 .log-time {
-  color: #003b00;
+  color: var(--terminal-border);
   margin-right: 6px;
 }
 
@@ -325,7 +332,7 @@ body {
 }
 
 .log-msg.info {
-  color: #003b00;
+  color: var(--terminal-muted);
 }
 
 .log-msg.thinking {
@@ -354,12 +361,20 @@ body {
   content: "⚠ BREACH DETECTED ⚠ ";
 }
 
+.journal-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .journal-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   border: 1px solid #00ff41;
   padding: 8px;
-  min-height: 0;
 }
 
 .journal-count {
@@ -371,7 +386,7 @@ body {
 }
 
 .journal-entry {
-  border: 1px solid #003b00;
+  border: 1px solid var(--terminal-border-soft);
   padding: 8px;
   margin-bottom: 8px;
   font-size: 0.72rem;
@@ -383,7 +398,7 @@ body {
 }
 
 .journal-entry .payload {
-  color: #003b00;
+  color: var(--terminal-muted);
   margin-bottom: 4px;
   word-break: break-all;
 }
@@ -399,20 +414,20 @@ body {
 }
 
 .journal-critique {
-  color: #003b00;
+  color: var(--terminal-muted);
   margin-top: 4px;
   font-size: 0.68rem;
 }
 
 .journal-empty {
-  color: #003b00;
+  color: var(--terminal-dim);
   font-size: 0.75rem;
   text-transform: uppercase;
 }
 
 .ws-indicator {
   font-size: 0.65rem;
-  color: #003b00;
+  color: var(--terminal-dim);
   margin-top: 8px;
   text-transform: uppercase;
 }
@@ -478,26 +493,53 @@ body {
   letter-spacing: 0.2em;
 }
 
-/* Blue Swarm remediation */
+/* Right column: attack journal + Blue Swarm (50/50 when both visible) */
 .panel-right-stack {
-  gap: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
 }
 
-.panel-right-journal {
-  flex: 1;
+.panel-right-stack--split .panel-right-split--journal,
+.panel-right-stack--split .panel-right-split--remediation {
+  flex: 1 1 50%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.remediation-panel {
-  flex-shrink: 0;
-  max-height: 42%;
-  margin-top: 10px;
-  padding-top: 10px;
+.panel-right-stack:not(.panel-right-stack--split) .panel-right-split--journal {
+  flex: 1 1 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-right-split--remediation {
   border-top: 1px solid #00b4d8;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.panel-right-split--journal > .panel-title {
+  flex-shrink: 0;
+}
+
+.panel-right-split--remediation .remediation-panel {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  max-height: none;
+}
+
+.remediation-panel {
+  display: block;
 }
 
 .remediation-title {
@@ -543,7 +585,7 @@ body {
   white-space: pre-wrap;
   word-break: break-word;
   color: #caf0f8;
-  max-height: 120px;
+  max-height: min(36vh, 240px);
   overflow-y: auto;
 }
 

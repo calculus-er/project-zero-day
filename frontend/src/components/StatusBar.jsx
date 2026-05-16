@@ -1,6 +1,4 @@
 export default function StatusBar({ currentAgent, phase, attemptCount }) {
-  console.log("[StatusBar] render", { currentAgent, phase, attemptCount });
-
   return (
     <div className="status-bar">
       <div className="status-bar-row">

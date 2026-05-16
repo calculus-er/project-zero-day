@@ -37,11 +37,16 @@ export default function App() {
 
   const isScanning = rawStatus === "running";
 
+  const showBlueColumn =
+    rawStatus === "breached" ||
+    remediation.status === "running" ||
+    remediation.status === "complete" ||
+    remediation.status === "failed";
+
   const fetchWebhookStatus = useCallback(async () => {
     try {
       const res = await fetch(`${API_BASE}/webhook/status`);
       const data = await res.json();
-      console.log("[App] webhook status:", data);
       setWebhookConnected(Boolean(data.ngrok_connected));
       setWebhookUrl(data.webhook_url || null);
     } catch (err) {
@@ -54,7 +59,6 @@ export default function App() {
     try {
       const res = await fetch(`${API_BASE}/status`);
       const data = await res.json();
-      console.log("[App] status poll:", data);
       setRawStatus(data.status);
       setScanStatus(statusToLabel(data.status));
       if (typeof data.ngrok_connected === "boolean") {
@@ -95,7 +99,6 @@ export default function App() {
   const handleWsMessage = useCallback((event) => {
     try {
       const data = JSON.parse(event.data);
-      console.log("[App] ws message:", data);
 
       setMessages((prev) => [...prev, data]);
       setCurrentAgent(data.agent || "—");
@@ -121,19 +124,16 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    console.log("[App] connecting WebSocket:", WS_URL);
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("[App] WebSocket connected");
       setWsConnected(true);
     };
 
     ws.onmessage = handleWsMessage;
 
     ws.onclose = () => {
-      console.log("[App] WebSocket closed");
       setWsConnected(false);
     };
 
@@ -175,7 +175,6 @@ export default function App() {
   }, [isScanning, rawStatus, fetchJournal, fetchRemediation, fetchStatus]);
 
   const handleLaunch = async () => {
-    console.log("[App] launching attack:", targetUrl, vulnLabel);
     setMessages([]);
     setJournalEntries([]);
     setScanStatus("SCANNING");
@@ -193,7 +192,6 @@ export default function App() {
         }),
       });
       const data = await res.json();
-      console.log("[App] scan response:", data);
 
       if (data.status === "already_running") {
         setScanStatus("SCANNING");
@@ -243,19 +241,18 @@ export default function App() {
           <AgentLog messages={messages} />
         </main>
 
-        <aside className="panel panel-right panel-right-stack">
-          <div className="panel-right-journal">
+        <aside
+          className={`panel panel-right panel-right-stack${showBlueColumn ? " panel-right-stack--split" : ""}`}
+        >
+          <div className="panel-right-split panel-right-split--journal">
             <h2 className="panel-title">ATTACK JOURNAL</h2>
             <JournalView entries={journalEntries} />
           </div>
-          <RemediationPanel
-            remediation={remediation}
-            visible={
-              rawStatus === "breached" ||
-              remediation.status === "running" ||
-              remediation.status === "complete"
-            }
-          />
+          {showBlueColumn && (
+            <div className="panel-right-split panel-right-split--remediation">
+              <RemediationPanel remediation={remediation} visible={true} />
+            </div>
+          )}
         </aside>
       </div>
     </div>

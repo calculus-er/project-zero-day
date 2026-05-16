@@ -25,6 +25,8 @@ from orchestrator import run_scan
 from remediation import remediation
 from tracing import ensure_initialized, get_active_execution_id, is_enabled as tracing_enabled
 from webhook_utils import verify_github_signature
+from demo_repo_sync import demo_sync_enabled_for_webhook, sync_demo_repo_to_arena
+from github_remediation_pr import pr_enabled
 
 ensure_initialized()
 
@@ -40,6 +42,11 @@ app.add_middleware(
 
 connected_clients: list[WebSocket] = []
 scan_state: dict[str, Any] = {"status": "idle", "scan_id": None}
+
+
+def _demo_restart_target_after_sync() -> bool:
+    raw = os.getenv("GITHUB_DEMO_RESTART_TARGET", "true").strip().lower()
+    return raw in ("1", "true", "yes", "on")
 
 
 async def send_update(message: str, agent: str, level: str) -> None:
@@ -71,6 +78,87 @@ async def _execute_scan(
     scan_state["status"] = "running"
     scan_state["scan_id"] = scan_id
     remediation.reset()
+
+    if trigger == "github_webhook":
+        if demo_sync_enabled_for_webhook():
+            await send_update(
+                "Phase 9: cloning GITHUB_DEMO_REPO (git may take up to a few minutes; "
+                "ensure GITHUB_TOKEN is set for private repos)…",
+                "WEBHOOK",
+                "thinking",
+            )
+            import asyncio
+
+            try:
+                clone_timeout = int(os.getenv("GITHUB_DEMO_CLONE_TIMEOUT", "120")) + 45
+            except ValueError:
+                clone_timeout = 165
+            try:
+                sync_result = await asyncio.wait_for(
+                    asyncio.to_thread(sync_demo_repo_to_arena),
+                    timeout=float(clone_timeout),
+                )
+            except asyncio.TimeoutError:
+                await send_update(
+                    "Phase 9: git clone timed out — check network, GITHUB_TOKEN, branch name, "
+                    "and that `git` is on PATH.",
+                    "WEBHOOK",
+                    "error",
+                )
+                scan_state["status"] = "failed"
+                return
+            if not sync_result.get("ok"):
+                await send_update(
+                    f"Phase 9 demo sync failed: {sync_result.get('error', 'unknown')}",
+                    "WEBHOOK",
+                    "error",
+                )
+                scan_state["status"] = "failed"
+                return
+            msg = f"Phase 9: copied demo app → {sync_result.get('copied_to')}"
+            hint = sync_result.get("hint") or ""
+            if hint:
+                msg += f" — {hint}"
+            await send_update(msg, "WEBHOOK", "success")
+
+            if _demo_restart_target_after_sync():
+                await send_update(
+                    "Phase 9: restarting Docker `target` so the container loads new app.py…",
+                    "WEBHOOK",
+                    "thinking",
+                )
+                from docker_target_restart import (
+                    restart_target_container,
+                    wait_target_healthy,
+                )
+
+                rr = await restart_target_container()
+                if not rr["ok"]:
+                    await send_update(
+                        f"Phase 9: docker compose restart failed "
+                        f"(exit {rr['returncode']}): {rr['output'][:400]}",
+                        "WEBHOOK",
+                        "error",
+                    )
+                else:
+                    await send_update(
+                        f"Phase 9: `docker compose restart {rr['service']}` OK — waiting for /health…",
+                        "WEBHOOK",
+                        "info",
+                    )
+                    health = await wait_target_healthy(target_url)
+                    if health.get("ok"):
+                        await send_update(
+                            f"Phase 9: target healthy after {health['attempts']} /health check(s)",
+                            "WEBHOOK",
+                            "success",
+                        )
+                    else:
+                        await send_update(
+                            f"Phase 9: /health not OK after restart — {health.get('error', 'unknown')}",
+                            "WEBHOOK",
+                            "error",
+                        )
 
     try:
         outcome = await run_scan(
@@ -109,6 +197,8 @@ async def webhook_status():
     return {
         **ngrok,
         "github_secret_configured": bool(os.getenv("GITHUB_WEBHOOK_SECRET")),
+        "demo_sync_on_webhook": demo_sync_enabled_for_webhook(),
+        "github_pr_enabled": pr_enabled(),
     }
 
 
@@ -159,7 +249,25 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     payload = json.loads(body)
     repo_name = payload.get("repository", {}).get("name", "unknown")
     pusher = payload.get("pusher", {}).get("name", "unknown")
-    branch = payload.get("ref", "unknown").replace("refs/heads/", "")
+    ref = payload.get("ref", "") or ""
+    branch = ref.replace("refs/heads/", "") if ref.startswith("refs/heads/") else ref
+
+    # Phase 9 PRs push branch remediation/<scan-id> → GitHub fires another push webhook.
+    # Syncing again would re-copy main's app.py over the local patch and wipe remediation UI.
+    if branch.startswith("remediation/"):
+        return {
+            "status": "ignored",
+            "reason": "remediation/* branch (automated PR fix — prevents sync/scan loop)",
+        }
+
+    allow = os.getenv("GITHUB_WEBHOOK_ONLY_BRANCHES", "").strip()
+    if allow:
+        allowed = {b.strip() for b in allow.split(",") if b.strip()}
+        if branch not in allowed:
+            return {
+                "status": "ignored",
+                "reason": f"branch {branch!r} not in GITHUB_WEBHOOK_ONLY_BRANCHES",
+            }
 
     target_url = os.getenv("TARGET_URL", "http://localhost:5000")
     vuln_type = os.getenv("DEFAULT_VULN_TYPE", "sqli")

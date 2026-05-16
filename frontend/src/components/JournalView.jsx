@@ -1,6 +1,4 @@
 export default function JournalView({ entries }) {
-  console.log("[JournalView] entries:", entries.length);
-
   return (
     <div className="journal-panel">
       <p className="journal-count">ATTEMPTS: {entries.length}</p>

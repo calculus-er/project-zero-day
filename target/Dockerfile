@@ -7,6 +7,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY incoming_sync.py /incoming_sync.py
+COPY entrypoint.py /entrypoint.py
+
 EXPOSE 5000
 
-CMD ["python", "app.py"]
+ENV ARENA_ENTRY_FILE=app.py
+CMD ["python", "/entrypoint.py"]

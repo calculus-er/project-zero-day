@@ -7,7 +7,6 @@ export default function BreachAlert({ trigger }) {
   useEffect(() => {
     if (!trigger) return;
 
-    console.log("[BreachAlert] breach triggered at", trigger);
     setVisible(true);
     setPhase("blink");
 

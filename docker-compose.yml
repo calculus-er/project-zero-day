@@ -3,7 +3,17 @@ services:
     build: ./target
     ports:
       - "5000:5000"
+    environment:
+      # Host filename for the mounted app (use ``auto`` if exactly one .py in arena/source).
+      ARENA_ENTRY_FILE: ${ARENA_ENTRY_FILE:-app.py}
+      # Copy arena/incoming/*.py → arena/source/app.py before start (see ARENA_INCOMING_SYNC).
+      ARENA_INCOMING_SYNC: ${ARENA_INCOMING_SYNC:-false}
+      # Optional basename under arena/incoming/ (if unset and sync on: exactly one .py required)
+      # ARENA_INCOMING_FILE=
+      PYTHONUNBUFFERED: "1"
     volumes:
-      # Tier 1: edit arena/source/app.py on the host; container runs it live.
+      # Tier 1: mount folder; ARENA_ENTRY_FILE selects which ``*.py`` runs (default app.py).
       - ./arena/source:/app
+      # Drop any ``*.py`` here; with ARENA_INCOMING_SYNC=true it is copied to app.py on container start.
+      - ./arena/incoming:/incoming:ro
     restart: unless-stopped

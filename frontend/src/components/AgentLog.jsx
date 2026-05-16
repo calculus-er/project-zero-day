@@ -5,7 +5,6 @@ export default function AgentLog({ messages }) {
   const bottomRef = useRef(null);
 
   useEffect(() => {
-    console.log("[AgentLog] messages count:", messages.length);
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 

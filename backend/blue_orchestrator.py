@@ -140,6 +140,27 @@ async def run_blue_swarm(
                 "Patch verified — winning payload blocked in simulation and on live target."
             )
 
+    pr_url: str | None = None
+    if logic_ok:
+        from arena_util import arena_app_path
+        from github_remediation_pr import open_remediation_pr
+
+        try:
+            remediated = arena_app_path().read_text(encoding="utf-8")
+            pr_body = (
+                f"**Fix summary (Epsilon)**\n{epsilon_result.get('fix_summary', '')}\n\n"
+                f"**Diagnosis (Delta)**\n{delta_result.get('diagnosis', '')}"
+            )[:12000]
+            pr_out = await open_remediation_pr(
+                scan_id,
+                broadcast_fn,
+                remediated,
+                summary=pr_body,
+            )
+            pr_url = pr_out.get("url")
+        except Exception as exc:
+            await broadcast_fn(f"Phase 9: PR step error — {exc}", "SYSTEM", "error")
+
     remediation.complete(
         diagnosis=delta_result.get("diagnosis", ""),
         fix_summary=epsilon_result.get("fix_summary", ""),
@@ -154,6 +175,7 @@ async def run_blue_swarm(
         arena_source_path=epsilon_result.get("arena_source_path"),
         target_restarted=target_restarted,
         target_health_ok=target_health_ok,
+        pr_url=pr_url,
     )
 
     trace_step(

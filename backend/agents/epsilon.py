@@ -7,6 +7,7 @@ from patch_apply import backup_arena_app, read_arena_app, validate_python_source
 from patch_templates import build_remediation
 from template_remediate import apply_template_remediation
 from arena_util import arena_app_path
+from tools.file_ops import write_patch
 
 BroadcastFn = Callable[[str, str, str], Awaitable[None]]
 
@@ -111,6 +112,7 @@ async def run_epsilon(
     )
 
     patch_path = write_patch(filename, export_header)
+    patches_dir = os.path.normpath(os.path.dirname(patch_path))
 
     await broadcast_fn(
         f"Epsilon: arena/source/app.py updated — export: logs/patches/{filename}",
@@ -123,7 +125,7 @@ async def run_epsilon(
         "patch_filename": filename,
         "diff_preview": diff_text or template_meta["diff_preview"],
         "fix_summary": fix_summary,
-        "patches_dir": os.path.normpath(PATCHES_DIR),
+        "patches_dir": patches_dir,
         "used_template_fallback": used_fallback,
         "arena_source_path": str(arena_app_path()),
     }
